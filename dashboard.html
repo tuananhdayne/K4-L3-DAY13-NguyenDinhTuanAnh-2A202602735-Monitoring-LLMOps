@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>K4-L3B Day 13 Monitoring & LLMOps Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0b0f19;
+      --bg-card: rgba(18, 24, 38, 0.85);
+      --border-card: rgba(255, 255, 255, 0.08);
+      --text-primary: #f3f4f6;
+      --text-secondary: #9ca3af;
+      --accent-blue: #38bdf8;
+      --accent-indigo: #818cf8;
+      --accent-purple: #c084fc;
+      --accent-emerald: #34d399;
+      --accent-amber: #fbbf24;
+      --accent-rose: #f43f5e;
+      --threshold-color: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 24px;
+      line-height: 1.5;
+    }
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-card);
+    }
+    .header-title h1 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #38bdf8, #818cf8, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header-title p {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+    .header-badges {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-card);
+      color: var(--text-secondary);
+    }
+    .badge-live {
+      background: rgba(52, 211, 153, 0.15);
+      color: #34d399;
+      border-color: rgba(52, 211, 153, 0.3);
+    }
+    .badge-live::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 8px #34d399;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .summary-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      padding: 16px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .summary-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+    .card-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .card-value {
+      font-size: 22px;
+      font-weight: 700;
+      margin-top: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-primary);
+    }
+    .card-subtext {
+      font-size: 11px;
+      margin-top: 4px;
+      color: var(--text-secondary);
+    }
+    .status-ok { color: #34d399; font-weight: 600; }
+    .status-warn { color: #fbbf24; font-weight: 600; }
+    .status-alert { color: #f43f5e; font-weight: 600; }
+
+    .panels-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 1024px) {
+      .panels-grid { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-card);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 14px;
+    }
+    .panel-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f9fafb;
+    }
+    .panel-meta {
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-secondary);
+    }
+    .chart-container {
+      position: relative;
+      flex-grow: 1;
+      min-height: 240px;
+      width: 100%;
+    }
+    .threshold-badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+  <header class="dashboard-header">
+    <div class="header-title">
+      <h1>K4-L3B Day 13 Monitoring & LLMOps Dashboard</h1>
+      <p>Student: Nguyen Dinh Tuan Anh (MSSV: 2A202602735) &bull; Contract: config/dashboard.yaml &bull; Source: data/logs.jsonl</p>
+    </div>
+    <div class="header-badges">
+      <span class="badge badge-live">LIVE (Refresh 30s)</span>
+      <span class="badge">Window: 60m</span>
+      <span class="badge">UTC Timeline</span>
+    </div>
+  </header>
+
+  <section class="summary-grid">
+    <div class="summary-card">
+      <div class="card-label">Latency P95</div>
+      <div class="card-value">2652.0 <span style="font-size:14px;font-weight:400;color:var(--text-secondary)">ms</span></div>
+      <div class="card-subtext">Threshold: &le; 3000ms &bull; <span class="status-ok">PASS</span></div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">TTFT P95</div>
+      <div class="card-value">50.0 <span style="font-size:14px;font-weight:400;color:var(--text-secondary)">ms</span></div>
+      <div class="card-subtext">Time to first token</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">Total Requests</div>
+      <div class="card-value">15</div>
+      <div class="card-subtext">Traffic in 60m window</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">Error Rate</div>
+      <div class="card-value">0.0%</div>
+      <div class="card-subtext">Threshold: &le; 2.0% &bull; <span class="status-ok">PASS</span></div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">Retrieval Success</div>
+      <div class="card-value">100.0%</div>
+      <div class="card-subtext">Target: &ge; 90% &bull; <span class="status-ok">PASS</span></div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">Total Cost</div>
+      <div class="card-value">$0.0281</div>
+      <div class="card-subtext">Threshold: &le; $2.50 &bull; <span class="status-ok">PASS</span></div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">Total Tokens</div>
+      <div class="card-value">2,282</div>
+      <div class="card-subtext">In + Out &bull; Limit: 50,000</div>
+    </div>
+    <div class="summary-card">
+      <div class="card-label">Quality Proxy</div>
+      <div class="card-value">0.87</div>
+      <div class="card-subtext">Threshold: &ge; 0.75 &bull; <span class="status-ok">PASS</span></div>
+    </div>
+  </section>
+
+  <main class="panels-grid">
+    <!-- Panel 1: Latency -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">1. Latency percentiles and TTFT</span>
+        <span class="threshold-badge">Threshold: P95 &le; 3000ms</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="chart-latency"></canvas>
+      </div>
+    </div>
+
+    <!-- Panel 2: Traffic -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">2. Request traffic</span>
+        <span class="threshold-badge">Threshold: Rate &ge; 1 req/min</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="chart-traffic"></canvas>
+      </div>
+    </div>
+
+    <!-- Panel 3: Errors -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">3. Error rate and retrieval success</span>
+        <span class="threshold-badge">Threshold: Error &le; 2%</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="chart-errors"></canvas>
+      </div>
+    </div>
+
+    <!-- Panel 4: Cost -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">4. Cost over time</span>
+        <span class="threshold-badge">Threshold: Total &le; $2.50</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="chart-cost"></canvas>
+      </div>
+    </div>
+
+    <!-- Panel 5: Tokens -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">5. Input and output tokens</span>
+        <span class="threshold-badge">Threshold: Sum &le; 50,000</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="chart-tokens"></canvas>
+      </div>
+    </div>
+
+    <!-- Panel 6: Quality -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">6. Quality proxy</span>
+        <span class="threshold-badge">Threshold: Mean &ge; 0.75</span>
+      </div>
+      <div class="chart-container">
+        <canvas id="chart-quality"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const data = {"labels": ["05:12"], "p50": [151.0], "p95": [2652.0], "p99": [2652.0], "ttft_p95": [50.0], "traffic": [15], "error_rate": [0.0], "retrieval_rate": [100.0], "cost_per_min": [0.02807], "cumulative_cost": [0.02807], "tokens_in": [513], "tokens_out": [1769], "quality_avg": [0.87], "summary": {"p95_overall": 2652.0, "ttft_p95_overall": 50.0, "total_requests": 15, "overall_error_rate": 0.0, "overall_retrieval_rate": 100.0, "total_cost": 0.0281, "total_tokens": 2282, "avg_quality": 0.87, "window_start": "2026-09-30T05:12Z", "window_end": "2026-09-30T05:12Z"}};
+
+    Chart.defaults.color = '#9ca3af';
+    Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.07)';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+
+    // Panel 1: Latency
+    new Chart(document.getElementById('chart-latency'), {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [
+          { label: 'P99 Latency (ms)', data: data.p99, borderColor: '#f43f5e', tension: 0.3, pointRadius: 3 },
+          { label: 'P95 Latency (ms)', data: data.p95, borderColor: '#fbbf24', tension: 0.3, pointRadius: 4, borderWidth: 2.5 },
+          { label: 'P50 Latency (ms)', data: data.p50, borderColor: '#38bdf8', tension: 0.3, pointRadius: 3 },
+          { label: 'TTFT P95 (ms)', data: data.ttft_p95, borderColor: '#34d399', borderDash: [4, 4], pointRadius: 2 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          annotation: {
+            annotations: {
+              line1: {
+                type: 'line',
+                yMin: 3000,
+                yMax: 3000,
+                borderColor: '#ef4444',
+                borderWidth: 2,
+                borderDash: [6, 6],
+                label: { display: true, content: 'P95 Threshold (3000ms)', position: 'end', backgroundColor: 'rgba(239, 68, 68, 0.8)', color: '#fff', font: { size: 10 } }
+              }
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Milliseconds (ms)' }, suggestedMax: 3500 }
+        }
+      }
+    });
+
+    // Panel 2: Traffic
+    new Chart(document.getElementById('chart-traffic'), {
+      type: 'bar',
+      data: {
+        labels: data.labels,
+        datasets: [
+          { label: 'Requests / min', data: data.traffic, backgroundColor: 'rgba(56, 189, 248, 0.6)', borderColor: '#38bdf8', borderWidth: 1, borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          annotation: {
+            annotations: {
+              line1: {
+                type: 'line',
+                yMin: 1,
+                yMax: 1,
+                borderColor: '#ef4444',
+                borderWidth: 1.5,
+                borderDash: [5, 5],
+                label: { display: true, content: 'Min Traffic Threshold (1 req/min)', position: 'start', backgroundColor: 'rgba(239, 68, 68, 0.8)', color: '#fff', font: { size: 10 } }
+              }
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Requests / minute' } }
+        }
+      }
+    });
+
+    // Panel 3: Errors & Retrieval
+    new Chart(document.getElementById('chart-errors'), {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [
+          { label: 'Error Rate (%)', data: data.error_rate, borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.1)', fill: true, tension: 0.2, pointRadius: 4 },
+          { label: 'Retrieval Success Rate (%)', data: data.retrieval_rate, borderColor: '#34d399', tension: 0.2, pointRadius: 3 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          annotation: {
+            annotations: {
+              line1: {
+                type: 'line',
+                yMin: 2,
+                yMax: 2,
+                borderColor: '#ef4444',
+                borderWidth: 2,
+                borderDash: [6, 6],
+                label: { display: true, content: 'Error Rate Threshold (2%)', position: 'end', backgroundColor: 'rgba(239, 68, 68, 0.8)', color: '#fff', font: { size: 10 } }
+              }
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, max: 100, title: { display: true, text: 'Percent (%)' } }
+        }
+      }
+    });
+
+    // Panel 4: Cost
+    new Chart(document.getElementById('chart-cost'), {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [
+          { label: 'Cumulative Cost ($)', data: data.cumulative_cost, borderColor: '#c084fc', backgroundColor: 'rgba(192, 132, 252, 0.15)', fill: true, tension: 0.2, yAxisID: 'y' },
+          { label: 'Cost / min ($)', data: data.cost_per_min, borderColor: '#818cf8', borderDash: [3, 3], pointRadius: 3, yAxisID: 'y' }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          annotation: {
+            annotations: {
+              line1: {
+                type: 'line',
+                yMin: 2.5,
+                yMax: 2.5,
+                borderColor: '#ef4444',
+                borderWidth: 2,
+                borderDash: [6, 6],
+                label: { display: true, content: 'Budget Threshold ($2.50)', position: 'end', backgroundColor: 'rgba(239, 68, 68, 0.8)', color: '#fff', font: { size: 10 } }
+              }
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'USD ($)' }, suggestedMax: 2.7 }
+        }
+      }
+    });
+
+    // Panel 5: Tokens
+    new Chart(document.getElementById('chart-tokens'), {
+      type: 'bar',
+      data: {
+        labels: data.labels,
+        datasets: [
+          { label: 'Input Tokens', data: data.tokens_in, backgroundColor: 'rgba(56, 189, 248, 0.7)', stack: 'tokens', borderRadius: 2 },
+          { label: 'Output Tokens', data: data.tokens_out, backgroundColor: 'rgba(129, 140, 248, 0.7)', stack: 'tokens', borderRadius: 2 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          annotation: {
+            annotations: {
+              line1: {
+                type: 'line',
+                yMin: 50000,
+                yMax: 50000,
+                borderColor: '#ef4444',
+                borderWidth: 2,
+                borderDash: [6, 6],
+                label: { display: true, content: 'Token Threshold (50k)', position: 'end', backgroundColor: 'rgba(239, 68, 68, 0.8)', color: '#fff', font: { size: 10 } }
+              }
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, stacked: true, title: { display: true, text: 'Tokens' } }
+        }
+      }
+    });
+
+    // Panel 6: Quality
+    new Chart(document.getElementById('chart-quality'), {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [
+          { label: 'Quality Score (Mean)', data: data.quality_avg, borderColor: '#34d399', backgroundColor: 'rgba(52, 211, 153, 0.15)', fill: true, tension: 0.3, pointRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          annotation: {
+            annotations: {
+              line1: {
+                type: 'line',
+                yMin: 0.75,
+                yMax: 0.75,
+                borderColor: '#ef4444',
+                borderWidth: 2,
+                borderDash: [6, 6],
+                label: { display: true, content: 'Quality Min Threshold (0.75)', position: 'start', backgroundColor: 'rgba(239, 68, 68, 0.8)', color: '#fff', font: { size: 10 } }
+              }
+            }
+          }
+        },
+        scales: {
+          y: { min: 0.0, max: 1.0, title: { display: true, text: 'Score (0 - 1)' } }
+        }
+      }
+    });
+
+    // Auto refresh every 30 seconds
+    setTimeout(() => {
+      window.location.reload();
+    }, 30000);
+  </script>
+</body>
+</html>
