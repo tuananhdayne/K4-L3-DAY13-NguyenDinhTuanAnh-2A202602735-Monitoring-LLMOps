@@ -4,13 +4,13 @@
 
 ## 1. Thông tin học viên
 
-- **Họ và tên:**
-- **MSSV:**
+- **Họ và tên:** Nguyễn Đình Tuấn Anh
+- **MSSV:** 2A202602735
 - **Lớp:** K4-L3B
-- **Repository URL:**
+- **Repository URL:** https://github.com/tuananhdayne/K4-L3-DAY13-NguyenDinhTuanAnh-2A202602735-Monitoring-LLMOps
 - **Commit SHA cuối:**
 - **Challenge ID:**
-- **Tên project Langfuse cá nhân:** `day13-k4-l3b-<MSSV>`
+- **Tên project Langfuse cá nhân:** `day13-k4-l3b-2A202602735`
 
 ## 2. Evidence index
 
@@ -37,13 +37,13 @@
 
 | Nội dung | Baseline | Kết quả cuối | Nhận xét |
 |---|---|---|---|
-| `validate_logs.py` | | | |
-| `validate_dashboard.py` | | | |
-| `pytest` | | | |
-| Số traces hợp lệ | | | |
-| Số PII leak | | | |
-| Latency P95 / TTFT P95 | | | |
-| Retrieval success rate | | | |
+| `validate_logs.py` | 30/100 | | Thiếu correlation ID & context enrichment |
+| `validate_dashboard.py` | 6/6 panel hợp lệ | | Khớp contract schema |
+| `pytest` | 22 passed | | Đạt toàn bộ starter tests |
+| Số traces hợp lệ | 10 | | 10/10 request gửi thành công trace |
+| Số PII leak | 0 | | PII scrubber cơ bản hoạt động |
+| Latency P95 / TTFT P95 | ~973ms / 50ms | | Baseline load test |
+| Retrieval success rate | 100% | | Baseline retrieval mock |
 
 ## 4. Logging và PII
 
